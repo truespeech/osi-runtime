@@ -2,6 +2,8 @@
 
 An open-source runtime for [OSI (Open Semantic Interchange)](https://open-semantic-interchange.org/) semantic models. It reads an OSI YAML definition and generates SQL from programmatic semantic queries — you ask for a metric by name, and it produces the correct query.
 
+**[Try the interactive demo →](https://truespeech.io/osi-runtime.html)** · Part of the [truespeech](https://truespeech.io) project
+
 ## What it does
 
 OSI is a [vendor-neutral standard](https://github.com/open-semantic-interchange/OSI) for describing semantic models — metrics, dimensions, datasets, and relationships. This runtime is the bridge between an OSI model definition and a SQL database: given a metric name and dimension constraints, it generates the correct SQL query.
