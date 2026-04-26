@@ -1,25 +1,19 @@
 import type { SemanticModel } from "./model.js";
-import type { SemanticQuery, MetricInfo, DimensionInfo } from "./types.js";
-export type { SemanticQuery, GroupByClause, DimensionGroupBy, TimeDimensionGroupBy, WhereClause, OrderByClause, TimeGrain, WhereOperator, MetricInfo, DimensionInfo, QueryResult, } from "./types.js";
+import type { SemanticQuery, TargetDialect, MetricInfo, DimensionInfo } from "./types.js";
+export type { SemanticQuery, TargetDialect, GroupByClause, DimensionGroupBy, TimeDimensionGroupBy, WhereClause, OrderByClause, TimeGrain, WhereOperator, MetricInfo, DimensionInfo, QueryResult, } from "./types.js";
 export type { SemanticModel } from "./model.js";
-/**
- * OSI Runtime — parses an OSI semantic model and generates SQL
- * from semantic queries.
- *
- * Usage:
- * ```
- * const runtime = new OsiRuntime(parsedYamlObject);
- * const sql = runtime.toSQL({ metric: "total_sales", groupBy: [{ dimension: "region" }] });
- * ```
- */
 export declare class OsiRuntime {
     private model;
+    private dialect;
     /**
      * Create a new OsiRuntime from a raw OSI model object.
-     * The object should be the result of parsing OSI YAML/JSON —
-     * the consumer handles deserialization.
+     *
+     * @param rawModel - The result of parsing OSI YAML/JSON (consumer handles deserialization)
+     * @param dialect - Target SQL dialect (default: "ansi"). Currently only "ansi" is supported
+     *                  (compatible with DuckDB, PostgreSQL, Snowflake). Passing "bigquery" or
+     *                  "mysql" will throw an error until those dialects are implemented.
      */
-    constructor(rawModel: unknown);
+    constructor(rawModel: unknown, dialect?: TargetDialect);
     /**
      * List all metrics defined in the semantic model.
      */
@@ -29,6 +23,13 @@ export declare class OsiRuntime {
      * Returns dimensions from the dataset(s) the metric references.
      */
     dimensionsForMetric(metricName: string): DimensionInfo[];
+    /**
+     * Look up the primary time dimension for a metric.
+     * Returns the DimensionInfo for the field marked is_primary in the
+     * metric's home dataset, or null if no primary time is declared.
+     * Throws if the metric is not found.
+     */
+    primaryTimeForMetric(metricName: string): DimensionInfo | null;
     /**
      * Generate SQL for a semantic query.
      * This is the core method — it takes a metric name, optional

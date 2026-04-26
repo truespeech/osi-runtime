@@ -72,6 +72,10 @@ Returns all metrics defined in the semantic model, with descriptions and AI cont
 
 Returns all dimensions that can be used to query the given metric. Each dimension indicates whether it is a time dimension (`isTime: true`).
 
+### `runtime.primaryTimeForMetric(name): DimensionInfo | null`
+
+Returns the primary time dimension for the metric's home dataset, or `null` if none is declared. Useful for callers (such as higher-level languages or query builders) that need to know which time field is the metric's natural temporal axis without scanning all dimensions. Throws if the metric is not found.
+
 ### `runtime.toSQL(query): string`
 
 The core method. Generates a SQL query from a `SemanticQuery` object:
@@ -141,6 +145,33 @@ semantic_model:
 
 A complete example with AI context, multiple metrics, and sample data is in [`examples/retail_sales/`](examples/retail_sales/).
 
+### Primary time dimension
+
+A time dimension can additionally be marked as the **primary** time for its dataset:
+
+```yaml
+fields:
+  - name: order_date
+    expression:
+      dialects:
+        - dialect: ANSI_SQL
+          expression: "order_date"
+    dimension:
+      is_time: true
+      is_primary: true
+```
+
+The primary time dimension is the dataset's natural temporal axis — what most queries against the dataset are naturally scoped by. Higher-level languages built on top of OSI (like the True Speech runtime) use it to support implicit time anchoring in queries. The runtime exposes it via `primaryTimeForMetric()`.
+
+Rules:
+- A field marked `is_primary: true` must also have `is_time: true`.
+- At most one field per dataset may be marked `is_primary: true`.
+- The flag is optional — datasets without a primary time still parse cleanly.
+
+### Reserved identifier names
+
+The following names are reserved and cannot be used as field or metric names: `day`, `week`, `month`, `quarter`, `year`. These are reserved as time grains by higher-level languages built on top of OSI. The check is case-insensitive.
+
 ## Development
 
 ### Prerequisites
@@ -171,7 +202,7 @@ npm test
 
 Runs unit tests (parser validation, SQL generation) and integration tests (generated SQL executed against a real in-memory DuckDB instance loaded with sample data).
 
-The test suite has 57 tests covering:
+The test suite has 75 tests covering:
 - **Parser tests** — valid models, error cases, AI context at all levels
 - **Resolver tests** — all clause types, all 5 time grains, all operators, error cases
 - **Integration tests** — generated SQL executed against DuckDB, results verified against manual queries

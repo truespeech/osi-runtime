@@ -29,6 +29,7 @@ export interface Field {
 }
 export interface Dimension {
     isTime: boolean;
+    isPrimary?: boolean;
 }
 export interface Expression {
     dialects: Dialect[];

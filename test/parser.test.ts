@@ -279,3 +279,215 @@ describe("parseModel", () => {
     );
   });
 });
+
+describe("parser - primary time dimension", () => {
+  const datasetWith = (extraFields: unknown[]) => ({
+    semantic_model: [
+      {
+        name: "m",
+        datasets: [
+          {
+            name: "orders",
+            source: "orders",
+            fields: [
+              {
+                name: "amount",
+                expression: {
+                  dialects: [{ dialect: "ANSI_SQL", expression: "amount" }],
+                },
+              },
+              ...extraFields,
+            ],
+          },
+        ],
+      },
+    ],
+  });
+
+  it("parses is_primary: true on a time dimension", () => {
+    const result = parseModel(
+      datasetWith([
+        {
+          name: "order_date",
+          expression: {
+            dialects: [{ dialect: "ANSI_SQL", expression: "order_date" }],
+          },
+          dimension: { is_time: true, is_primary: true },
+        },
+      ])
+    );
+    const field = result.datasets[0].fields.find(
+      (f) => f.name === "order_date"
+    );
+    assert.equal(field?.dimension?.isPrimary, true);
+    assert.equal(field?.dimension?.isTime, true);
+  });
+
+  it("does not set isPrimary when flag is absent", () => {
+    const result = parseModel(
+      datasetWith([
+        {
+          name: "order_date",
+          expression: {
+            dialects: [{ dialect: "ANSI_SQL", expression: "order_date" }],
+          },
+          dimension: { is_time: true },
+        },
+      ])
+    );
+    const field = result.datasets[0].fields.find(
+      (f) => f.name === "order_date"
+    );
+    assert.equal(field?.dimension?.isPrimary, undefined);
+  });
+
+  it("throws when is_primary is set without is_time", () => {
+    assert.throws(
+      () =>
+        parseModel(
+          datasetWith([
+            {
+              name: "region",
+              expression: {
+                dialects: [{ dialect: "ANSI_SQL", expression: "region" }],
+              },
+              dimension: { is_time: false, is_primary: true },
+            },
+          ])
+        ),
+      /is_primary requires is_time/
+    );
+  });
+
+  it("throws when more than one field is marked is_primary", () => {
+    assert.throws(
+      () =>
+        parseModel(
+          datasetWith([
+            {
+              name: "order_date",
+              expression: {
+                dialects: [{ dialect: "ANSI_SQL", expression: "order_date" }],
+              },
+              dimension: { is_time: true, is_primary: true },
+            },
+            {
+              name: "ship_date",
+              expression: {
+                dialects: [{ dialect: "ANSI_SQL", expression: "ship_date" }],
+              },
+              dimension: { is_time: true, is_primary: true },
+            },
+          ])
+        ),
+      /at most one field may be marked is_primary/
+    );
+  });
+});
+
+describe("parser - reserved grain words", () => {
+  const grainWords = ["day", "week", "month", "quarter", "year"];
+
+  for (const word of grainWords) {
+    it(`rejects field name "${word}"`, () => {
+      assert.throws(
+        () =>
+          parseModel({
+            semantic_model: [
+              {
+                name: "m",
+                datasets: [
+                  {
+                    name: "orders",
+                    source: "orders",
+                    fields: [
+                      {
+                        name: word,
+                        expression: {
+                          dialects: [
+                            { dialect: "ANSI_SQL", expression: word },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          }),
+        /reserved grain word/
+      );
+    });
+
+    it(`rejects metric name "${word}"`, () => {
+      assert.throws(
+        () =>
+          parseModel({
+            semantic_model: [
+              {
+                name: "m",
+                datasets: [
+                  {
+                    name: "orders",
+                    source: "orders",
+                    fields: [
+                      {
+                        name: "amount",
+                        expression: {
+                          dialects: [
+                            { dialect: "ANSI_SQL", expression: "amount" },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                ],
+                metrics: [
+                  {
+                    name: word,
+                    expression: {
+                      dialects: [
+                        {
+                          dialect: "ANSI_SQL",
+                          expression: "SUM(orders.amount)",
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+          }),
+        /reserved grain word/
+      );
+    });
+  }
+
+  it("rejects field name regardless of case", () => {
+    assert.throws(
+      () =>
+        parseModel({
+          semantic_model: [
+            {
+              name: "m",
+              datasets: [
+                {
+                  name: "orders",
+                  source: "orders",
+                  fields: [
+                    {
+                      name: "Month",
+                      expression: {
+                        dialects: [{ dialect: "ANSI_SQL", expression: "Month" }],
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+      /reserved grain word/
+    );
+  });
+});

@@ -81,3 +81,75 @@ describe("OsiRuntime", () => {
     assert.equal(dims.length, 0);
   });
 });
+
+const MODEL_WITH_PRIMARY_TIME = {
+  semantic_model: [
+    {
+      name: "test",
+      datasets: [
+        {
+          name: "orders",
+          source: "orders",
+          fields: [
+            {
+              name: "order_date",
+              expression: {
+                dialects: [{ dialect: "ANSI_SQL", expression: "order_date" }],
+              },
+              dimension: { is_time: true, is_primary: true },
+              description: "Date the order was placed",
+            },
+            {
+              name: "ship_date",
+              expression: {
+                dialects: [{ dialect: "ANSI_SQL", expression: "ship_date" }],
+              },
+              dimension: { is_time: true },
+            },
+            {
+              name: "amount",
+              expression: {
+                dialects: [{ dialect: "ANSI_SQL", expression: "amount" }],
+              },
+            },
+          ],
+        },
+      ],
+      metrics: [
+        {
+          name: "total_sales",
+          expression: {
+            dialects: [
+              { dialect: "ANSI_SQL", expression: "SUM(orders.amount)" },
+            ],
+          },
+        },
+      ],
+    },
+  ],
+};
+
+describe("OsiRuntime.primaryTimeForMetric", () => {
+  it("returns the primary time field for a metric whose dataset has one", () => {
+    const runtime = new OsiRuntime(MODEL_WITH_PRIMARY_TIME);
+    const primary = runtime.primaryTimeForMetric("total_sales");
+    assert.equal(primary?.name, "order_date");
+    assert.equal(primary?.isTime, true);
+    assert.equal(primary?.dataset, "orders");
+    assert.equal(primary?.description, "Date the order was placed");
+  });
+
+  it("returns null when the metric's dataset has no primary time", () => {
+    const runtime = new OsiRuntime(MINIMAL_MODEL);
+    const primary = runtime.primaryTimeForMetric("total_sales");
+    assert.equal(primary, null);
+  });
+
+  it("throws on unknown metric", () => {
+    const runtime = new OsiRuntime(MODEL_WITH_PRIMARY_TIME);
+    assert.throws(
+      () => runtime.primaryTimeForMetric("nonexistent"),
+      /Unknown metric "nonexistent"/
+    );
+  });
+});

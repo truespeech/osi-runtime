@@ -5,6 +5,13 @@ const VALID_DIALECTS = new Set([
     "TABLEAU",
     "DATABRICKS",
 ]);
+const RESERVED_GRAIN_WORDS = new Set([
+    "day",
+    "week",
+    "month",
+    "quarter",
+    "year",
+]);
 /**
  * Parse a raw OSI YAML object (already deserialized from YAML/JSON)
  * into a validated SemanticModel.
@@ -61,6 +68,11 @@ function parseDataset(obj, index) {
     const fields = Array.isArray(fieldsRaw)
         ? fieldsRaw.map((f, i) => parseField(f, i, ctx))
         : [];
+    const primaryFields = fields.filter((f) => f.dimension?.isPrimary);
+    if (primaryFields.length > 1) {
+        const names = primaryFields.map((f) => f.name).join(", ");
+        throw new Error(`${ctx}: at most one field may be marked is_primary, found: ${names}`);
+    }
     return {
         name,
         source,
@@ -73,8 +85,12 @@ function parseDataset(obj, index) {
 function parseField(obj, index, parentCtx) {
     const ctx = `${parentCtx}.fields[${index}]`;
     const name = requireString(obj, "name", ctx);
+    checkReservedName(name, ctx);
     const expression = parseExpression(obj["expression"], ctx);
     const dimension = parseDimension(obj["dimension"]);
+    if (dimension?.isPrimary && !dimension.isTime) {
+        throw new Error(`${ctx}.dimension is_primary requires is_time: true`);
+    }
     return {
         name,
         expression,
@@ -88,8 +104,10 @@ function parseDimension(raw) {
     if (!raw || typeof raw !== "object")
         return undefined;
     const obj = raw;
+    const isPrimary = obj["is_primary"] === true;
     return {
         isTime: obj["is_time"] === true,
+        isPrimary: isPrimary ? true : undefined,
     };
 }
 function parseExpression(raw, ctx) {
@@ -119,6 +137,7 @@ function parseDialect(obj, index, parentCtx) {
 function parseMetric(obj, index) {
     const ctx = `metrics[${index}]`;
     const name = requireString(obj, "name", ctx);
+    checkReservedName(name, ctx);
     const expression = parseExpression(obj["expression"], ctx);
     return {
         name,
@@ -160,6 +179,11 @@ function parseAiContext(raw) {
             ? synonymsRaw.map(String)
             : undefined,
     };
+}
+function checkReservedName(name, ctx) {
+    if (RESERVED_GRAIN_WORDS.has(name.toLowerCase())) {
+        throw new Error(`${ctx}.name "${name}" is a reserved grain word and cannot be used as an identifier`);
+    }
 }
 function requireString(obj, key, ctx) {
     const val = obj[key];

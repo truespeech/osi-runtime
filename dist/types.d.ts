@@ -1,6 +1,13 @@
 /**
  * Public query API types for the OSI runtime.
  */
+/**
+ * Target SQL dialect for generated queries.
+ * - "ansi" — ANSI SQL (compatible with DuckDB, PostgreSQL, Snowflake)
+ * - "bigquery" — Google BigQuery (not yet supported)
+ * - "mysql" — MySQL / SQLite (not yet supported)
+ */
+export type TargetDialect = "ansi" | "bigquery" | "mysql";
 export type TimeGrain = "day" | "week" | "month" | "quarter" | "year";
 export type WhereOperator = "=" | "!=" | ">" | "<" | ">=" | "<=" | "in" | "not_in";
 export interface DimensionGroupBy {

@@ -127,6 +127,51 @@ export class OsiRuntime {
   }
 
   /**
+   * Look up the primary time dimension for a metric.
+   * Returns the DimensionInfo for the field marked is_primary in the
+   * metric's home dataset, or null if no primary time is declared.
+   * Throws if the metric is not found.
+   */
+  primaryTimeForMetric(metricName: string): DimensionInfo | null {
+    const metric = this.model.metrics.find((m) => m.name === metricName);
+    if (!metric) {
+      const available = this.model.metrics.map((m) => m.name).join(", ");
+      throw new Error(
+        `Unknown metric "${metricName}". Available metrics: ${available}`
+      );
+    }
+
+    const metricExpr = metric.expression.dialects.find(
+      (d) => d.dialect === "ANSI_SQL"
+    )?.expression;
+
+    const homeDataset =
+      this.model.datasets.find(
+        (ds) => metricExpr?.includes(`${ds.name}.`)
+      ) ?? (this.model.datasets.length === 1 ? this.model.datasets[0] : undefined);
+
+    if (!homeDataset) return null;
+
+    const primaryField = homeDataset.fields.find(
+      (f) => f.dimension?.isPrimary
+    );
+    if (!primaryField || !primaryField.dimension) return null;
+
+    return {
+      name: primaryField.name,
+      isTime: primaryField.dimension.isTime,
+      dataset: homeDataset.name,
+      description: primaryField.description,
+      aiContext: primaryField.aiContext
+        ? {
+            instructions: primaryField.aiContext.instructions,
+            synonyms: primaryField.aiContext.synonyms,
+          }
+        : undefined,
+    };
+  }
+
+  /**
    * Generate SQL for a semantic query.
    * This is the core method — it takes a metric name, optional
    * dimensions, filters, ordering, and limit, and returns a
